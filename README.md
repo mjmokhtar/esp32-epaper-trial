@@ -1,7 +1,7 @@
-# ePaper ESP32
+# ePaper Messenger
 
 ESP32 + WeAct Studio 2.13" ePaper display project built with ESP-IDF.  
-Menampilkan informasi WiFi, IP, kualitas sinyal, dan system info dalam mode **landscape 250×122**.
+Menampilkan informasi WiFi, IP, kualitas sinyal, dan system info dalam mode **landscape 250×128**.
 
 ---
 
@@ -11,8 +11,8 @@ Menampilkan informasi WiFi, IP, kualitas sinyal, dan system info dalam mode **la
 |---|---|
 | MCU | ESP32 (any variant) |
 | Display | WeAct Studio 2.13" ePaper (SSD1680) |
-| Resolusi fisik | 122×250 px |
-| Resolusi logika | 250×122 px (landscape) |
+| Resolusi fisik | 128×250 px |
+| Resolusi logika | 250×128 px (landscape) |
 | Warna | Hitam & Putih |
 
 ### Wiring
@@ -192,14 +192,84 @@ Setelah `epd_sleep()`, panel tidak bisa menerima command apapun.
 `epd_wake()` melakukan hardware reset + full init ulang sebelum bisa display lagi.
 Framebuffer di RAM ESP32 tetap aman — tidak hilang saat panel sleep.
 
-### Landscape transform
+# Preview Hasil
 
-Panel fisik 128×250 dirotasi ke landscape 250×128 menggunakan transform **Case 5**:
+Portrait (122×250)
+---
+![Portrait](images/Capture.PNG)
+
+Landscape (250×122)
+---
+![Landscape](images/image.jpeg)
+
+
+### Mengubah Orientasi Display (Portrait ↔ Landscape)
+
+Hanya **1 file** yang perlu diedit — `components/epaper/epaper.h`.  
+`epaper.c` sudah menggunakan `#if` sehingga transform otomatis mengikuti.
+
+#### `components/epaper/epaper.h` — uncomment salah satu
+
 ```c
-int px = y;   // physical x = logical y
-int py = x;   // physical y = logical x
+// ─── Panel Physical Specs ─────────────────────────────────────────────────────
+#define EPD_PHYSICAL_WIDTH   122
+#define EPD_PHYSICAL_HEIGHT  250
+#define EPD_BUF_WIDTH        ((EPD_PHYSICAL_WIDTH + 7) / 8)        // 16
+#define EPD_BUF_SIZE         (EPD_BUF_WIDTH * EPD_PHYSICAL_HEIGHT) // 4000
+
+// ─── Pilih orientasi — uncomment salah satu ──────────────────────────────────
+
+// PORTRAIT (122×250)
+// #define EPD_WIDTH    122
+// #define EPD_HEIGHT   250
+
+// LANDSCAPE (250×122) ← default aktif
+#define EPD_WIDTH    250
+#define EPD_HEIGHT   122
 ```
-Transform ini ditemukan melalui trial untuk orientasi spesifik WeAct Studio 2.13".
+
+#### `components/epaper/epaper.c` — tidak perlu diubah
+
+`epd_draw_pixel()` sudah handle kedua orientasi otomatis via `#if`:
+
+```c
+void epd_draw_pixel(int x, int y, uint8_t color)
+{
+    if (x < 0 || x >= EPD_WIDTH || y < 0 || y >= EPD_HEIGHT) return;
+
+#if (EPD_WIDTH == 250)
+    // LANDSCAPE (250×122) — Case 5
+    int px = y;
+    int py = x;
+#else
+    // PORTRAIT (122×250) — flip X dan Y
+    int px = (EPD_PHYSICAL_WIDTH  - 1) - x;
+    int py = (EPD_PHYSICAL_HEIGHT - 1) - y;
+#endif
+
+    int byte_idx = py * EPD_BUF_WIDTH + (px / 8);
+    int bit_pos  = 7 - (px % 8);
+
+    if (color == EPD_BLACK)
+        s_buf[byte_idx] &= ~(1 << bit_pos);
+    else
+        s_buf[byte_idx] |=  (1 << bit_pos);
+}
+```
+
+Ringkasan:
+
+| | Portrait | Landscape |
+|---|---|---|
+| `EPD_WIDTH` | `122` | `250` |
+| `EPD_HEIGHT` | `250` | `122` |
+| `EPD_PHYSICAL_WIDTH` | `122` (tetap) | `122` (tetap) |
+| `EPD_PHYSICAL_HEIGHT` | `250` (tetap) | `250` (tetap) |
+| `EPD_BUF_SIZE` | `4000` (tetap) | `4000` (tetap) |
+| Transform `px` | `(122-1) - x` | `y` |
+| Transform `py` | `(250-1) - y` | `x` |
+
+> Buffer fisik, init sequence, LUT, dan semua kode lain **tidak perlu diubah** sama sekali.
 
 ### GFX diadaptasi dari Adafruit GFX
 
