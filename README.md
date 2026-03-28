@@ -11,8 +11,8 @@ Menampilkan informasi WiFi, IP, kualitas sinyal, dan system info dalam mode **la
 |---|---|
 | MCU | ESP32 (any variant) |
 | Display | WeAct Studio 2.13" ePaper (SSD1680) |
-| Resolusi fisik | 128×250 px |
-| Resolusi logika | 250×128 px (landscape) |
+| Resolusi fisik | 122×250 px |
+| Resolusi logika | 250×122 px (landscape) |
 | Warna | Hitam & Putih |
 
 ### Wiring
